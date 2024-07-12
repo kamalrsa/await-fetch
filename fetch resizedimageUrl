@@ -1,0 +1,256 @@
+this.init_plugin = function() {
+    let p = 0;
+    let skip;
+    let limit = 42;
+   
+    let searchFormName;
+    let host = location.host;
+    
+    let searchData = {};
+    
+    
+    let pageUrl = window.location.href;
+    let searchItem = pageUrl.substr(pageUrl.lastIndexOf('/')+1);
+    
+    searchItem = searchItem.split("?")[0];
+    
+    if(host === "byggeri-arkitektur.dk") {
+         
+        if(window.location.href.match(/tag/) != null){
+            searchFormName = "tag_articles_ba";
+            skip = 30;
+            searchData.tag = searchItem;
+            searchData.nocnt = true;
+            
+        }else{
+            searchFormName =  "group_articles_ba";
+            skip = 15;
+            searchData.group = searchItem;
+            searchData.nocnt = true;
+        }
+
+    }
+    else if(host === "indret.dk") {
+        if(window.location.href.match(/tag/) != null){
+            searchFormName = "tag_articles_indret";
+            skip = 0;
+            searchData.tag = searchItem;
+            searchData.nocnt = true;
+            
+        }else{
+            searchFormName =  "group_articles_indret";
+            skip = 15;
+            searchData.group = searchItem;
+            searchData.nocnt = true;
+        }
+    }else{
+        if(window.location.toString().includes("tag")){
+            searchFormName = "tag_articles_boaa";
+            skip = 0;
+            searchData.tag = searchItem;
+            searchData.nocnt = true;
+            
+        }else{
+            searchFormName =  "group_articles_boaa";
+            skip = 15;
+            searchData.group = searchItem;
+            searchData.nocnt = true;
+        }
+    }
+    
+  
+    
+   
+
+   
+    document.querySelector('.searchMore').innerHTML +='Læs mere';
+    document.querySelector(".searchMore").addEventListener("click", function(event){
+        
+        groupArticles(searchData);
+        
+        
+        
+        
+    });
+    
+    
+    function groupArticles(searchData) {
+        
+     
+        let txtSearchClb = function(success, data) {
+            console.log("displaygrouparticles");
+            console.log(data);
+            
+            let articles = data[searchFormName];
+       
+            displayArticles(articles);
+            
+            if(articles.length < limit ) {
+                document.querySelector('.search-more-div').style.display = "none";
+            }
+        };
+        
+        
+        
+        skip = skip;
+        p++;
+        
+        if(p < 10) {
+            SYSMS.search(searchFormName, skip, limit, searchData, txtSearchClb);
+            skip = skip + p * limit; 
+           
+        }
+       
+    }
+    
+    
+    
+    
+    function displayArticles(articles) {
+        
+       let reqObj={};
+        let urls = [];
+        
+    
+        for(let i = 0; i < articles.length; i++){
+           
+            let uri = articles[i].image[0].uri;
+         
+           
+           let imageResizeObj = {
+                "base":"https://dl2phipa8wx75.cloudfront.net",
+                "uri": uri,
+                "acc":"mediaxpress",
+                "height":266,
+                "width":400
+                
+            };
+            
+            urls.push(imageResizeObj);
+           
+         }
+          
+        reqObj.urls = urls;
+        
+        (async () => {
+            const response = await fetch('/cms/secure/ajax/resize', {
+                method: 'POST',
+                headers: {
+                  'Accept': 'application/json',
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(reqObj)
+                }).catch(err => {
+                    /*console.log(err.response.data);*/
+                });
+            const data = await response.json();
+            
+           
+            let resizedUrls = data.data.resizedUrls;
+        
+        
+            articleBuilder(articles, resizedUrls);
+        })();
+        
+        /*fetch('/cms/secure/ajax/resize', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            
+           body: JSON.stringify(reqObj)
+        })
+        
+        .then(res => res.json())
+        .then(data => {
+        
+        
+        let resizedUrls = data.data.resizedUrls;
+        
+        
+        articleBuilder(articles, resizedUrls);
+        })
+        .catch(error => {
+        
+        
+        })  */
+        
+    }
+    
+    function articleBuilder(articles,  resizedUrls){  
+      
+      
+        let articleBuilder = "";
+        
+        if(articles) {
+            
+            for(let i=0; i < articles.length; i++) {
+                
+                let title = articles[i]._title;
+                let uri = articles[i]._uri;
+                let resizedUrl = resizedUrls[i];
+                let type = articles[i].type;
+                let tagList = articles[i]._rel_prosysarticle_prosystags;
+                let tagBuilder="";
+                
+                if(tagList.length > 0){
+                    
+                    for(let i = 0; i < tagList.length; i++) { 
+                       
+                        let tagName = tagList[i].name;
+                        let tag = '/tag/'+tagList[i].tag;    
+                        tagBuilder = tagBuilder + "<a href='"+tag+"'>#"+tagName+"</a>";
+                        
+                    }
+                    
+                }
+               
+           
+                articleBuilder = articleBuilder + articleItemTemplate({
+                    "title":title,
+                    "uri":uri,
+                    "type":type,
+                    "resizedUrl":resizedUrl,
+                    "tagBuilder": tagBuilder
+                });
+            }
+            
+            if(articles.length = 0 ) {
+                document.querySelector('.search-more-div').style.display = "none";
+            }
+            else {
+                
+                articleBuilder = '<div class="group-article-section">'+articleBuilder +'</div>' + "<div style='border-bottom:2px solid #0000006b; margin:20px 0;'></div>"; 
+            }
+            
+            document.querySelector(".display-articles").innerHTML += articleBuilder;
+            
+            
+            
+            
+            
+        }
+    }
+    
+    function articleItemTemplate(tmplData) {
+        
+        return `<div class="article-item">
+            <div class="articlePreview">
+                
+                <a href="${tmplData.uri}" target="_blank">
+                    
+                    <img src = "${tmplData.resizedUrl}">
+                    <div class="article-info">
+                        <p> ${tmplData.type ==="sponsored"? 'Annonce':''}</p>
+                        ${tmplData.tagBuilder ? `<p class="tagList">${tmplData.tagBuilder}<p>` : ``}
+                        <p>${tmplData.title}</p>
+                       
+                        
+                    </div>
+                   
+                </a>
+            </div> 
+         
+        </div>`;
+    }
+}
